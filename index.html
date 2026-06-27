@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AeroTV - A premium, modern web-based IPTV player for watching free, live TV channels globally. Customize playlists, save favorites, and enjoy streaming with advanced controls.">
+  <title>AeroTV | Premium Live TV Streamer</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="lucide.min.js"></script>
+  <!-- HLS.js for HTTP Live Streaming -->
+  <script src="hls.min.js"></script>
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-midnight-blue">
+  <div class="app-container">
+    <!-- Sidebar: Playlists, Categories, Channel list -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo">
+            <i data-lucide="tv-2"></i>
+          </div>
+          <div class="brand-name">
+            <h1>AeroTV</h1>
+            <span>Live Streamer</span>
+          </div>
+        </div>
+        <button class="sidebar-toggle-btn" id="sidebarCloseBtn" aria-label="Close sidebar">
+          <i data-lucide="chevron-left"></i>
+        </button>
+      </div>
+
+      <!-- Playlists Selector/Manager -->
+      <div class="sidebar-section playlist-manager">
+        <div class="section-title">
+          <i data-lucide="library"></i>
+          <span>Playlist Source</span>
+        </div>
+        <div class="playlist-dropdown-wrapper">
+          <select id="playlistSelect" class="styled-select">
+            <optgroup label="Global Databases">
+              <option value="https://iptv-org.github.io/iptv/index.m3u">Global Verified Index (Default)</option>
+              <option value="https://iptv-org.github.io/iptv/iptv.m3u">Global Complete Database (8000+ Channels)</option>
+            </optgroup>
+            <optgroup label="By Country / Region">
+              <option value="https://iptv-org.github.io/iptv/countries/us.m3u">United States (US)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/uk.m3u">United Kingdom (UK)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/ca.m3u">Canada (CA)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/br.m3u">Brazil (BR)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/ar.m3u">Argentina (AR)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/de.m3u">Germany (DE)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/fr.m3u">France (FR)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/es.m3u">Spain (ES)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/it.m3u">Italy (IT)</option>
+              <option value="https://iptv-org.github.io/iptv/countries/nl.m3u">Netherlands (NL)</option>
+            </optgroup>
+            <optgroup label="Curated Categories">
+              <option value="https://iptv-org.github.io/iptv/categories/movies.m3u">Movies & Cinema</option>
+              <option value="https://iptv-org.github.io/iptv/categories/sports.m3u">Sports & Outdoors</option>
+              <option value="https://iptv-org.github.io/iptv/categories/news.m3u">News & Business</option>
+              <option value="https://iptv-org.github.io/iptv/categories/documentary.m3u">Documentaries</option>
+              <option value="https://iptv-org.github.io/iptv/categories/entertainment.m3u">General Entertainment</option>
+              <option value="https://iptv-org.github.io/iptv/categories/music.m3u">Music Channels</option>
+              <option value="https://iptv-org.github.io/iptv/categories/kids.m3u">Kids & Animation</option>
+              <option value="https://iptv-org.github.io/iptv/categories/series.m3u">TV Series</option>
+              <option value="https://iptv-org.github.io/iptv/categories/education.m3u">Education & Science</option>
+              <option value="https://iptv-org.github.io/iptv/categories/comedy.m3u">Comedy</option>
+              <option value="https://iptv-org.github.io/iptv/categories/lifestyle.m3u">Lifestyle & Travel</option>
+              <option value="https://iptv-org.github.io/iptv/categories/weather.m3u">Weather</option>
+            </optgroup>
+            <optgroup label="Others">
+              <option value="https://iptv-org.github.io/iptv/index.country.m3u">Meta-Playlist: By Country</option>
+              <option value="https://iptv-org.github.io/iptv/index.language.m3u">Meta-Playlist: By Language</option>
+              <option value="custom">-- Custom M3U URL --</option>
+            </optgroup>
+          </select>
+          <button class="btn-icon" id="addPlaylistBtn" title="Add Custom Playlist">
+            <i data-lucide="plus"></i>
+          </button>
+        </div>
+        
+        <!-- Custom playlist input area (hidden by default) -->
+        <div class="custom-playlist-input-container hidden" id="customPlaylistContainer">
+          <input type="text" id="customPlaylistUrl" placeholder="Enter .m3u or .m3u8 URL" class="styled-input">
+          <div class="custom-playlist-actions">
+            <button class="btn btn-secondary btn-sm" id="cancelCustomPlaylist">Cancel</button>
+            <button class="btn btn-primary btn-sm" id="loadCustomPlaylist">Load</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories & Filters -->
+      <div class="sidebar-section filters-section">
+        <div class="section-title">
+          <i data-lucide="sliders-horizontal"></i>
+          <span>Filter Channels</span>
+        </div>
+        <div class="search-box">
+          <i data-lucide="search" class="search-icon"></i>
+          <input type="text" id="channelSearch" placeholder="Search by name, country..." class="search-input">
+          <button class="clear-search-btn hidden" id="clearSearchBtn">
+            <i data-lucide="x"></i>
+          </button>
+        </div>
+        <div class="sidebar-dropdown-filters">
+          <select id="sidebarCountrySelect" class="styled-select filter-select">
+            <option value="all">All Countries</option>
+          </select>
+          <select id="sidebarLanguageSelect" class="styled-select filter-select">
+            <option value="all">All Languages</option>
+          </select>
+        </div>
+        <div class="category-tabs" id="categoryTabs">
+          <button class="category-tab active" data-category="all">All</button>
+          <button class="category-tab" data-category="favorites">
+            <i data-lucide="star"></i> Favorites
+          </button>
+        </div>
+        <div class="filters-toolbar">
+          <button class="btn-scan" id="scanBtn" title="Verify online status for listed channels">
+            <i data-lucide="radar"></i> <span>Scan Status</span>
+          </button>
+          <label class="toggle-container" title="Show only verified online streams">
+            <input type="checkbox" id="onlineToggle">
+            <span class="toggle-slider"></span>
+            <span class="toggle-label">Online Only</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Channel List container -->
+      <div class="channel-list-container">
+        <div class="channel-list-status" id="channelListStatus">
+          <div class="spinner"></div>
+          <span>Loading playlist...</span>
+        </div>
+        <div class="channel-list hidden" id="channelList">
+          <!-- Channels will be inserted dynamically here -->
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area: Video player and settings -->
+    <main class="main-content">
+      <!-- Top header bar -->
+      <header class="app-header">
+        <button class="sidebar-toggle-btn" id="sidebarOpenBtn" aria-label="Open sidebar">
+          <i data-lucide="menu"></i>
+        </button>
+        
+        <div class="active-channel-meta hidden" id="activeChannelMeta">
+          <img src="" alt="" class="header-channel-logo" id="headerChannelLogo" onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2240%22 height=%2240%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22 class=%22lucide lucide-tv%22><rect width=%2220%22 height=%2215%22 x=%222%22 y=%227%22 rx=%222%22 ry=%222%22/><path d=%22m17 2-5 5-5-5%22/></svg>'">
+          <div class="header-channel-info">
+            <h2 id="headerChannelName">Select a channel to play</h2>
+            <div class="header-channel-subinfo">
+              <span class="badge" id="headerChannelCategory">General</span>
+              <span class="badge" id="headerChannelCountry">Global</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="header-controls">
+          <!-- View Toggle Mode -->
+          <div class="view-toggle-container">
+            <button class="btn active" id="playerViewBtn" title="Switch to Player View">
+              <i data-lucide="tv"></i> <span>Player</span>
+            </button>
+            <button class="btn" id="gridViewBtn" title="Switch to Grid View (Video Wall)">
+              <i data-lucide="layout-grid"></i> <span>Grid Mode</span>
+            </button>
+          </div>
+
+          <!-- Theme selector -->
+          <div class="theme-selector-dropdown">
+            <button class="btn-icon" id="themeBtn" title="Switch Theme">
+              <i data-lucide="palette"></i>
+            </button>
+            <div class="theme-dropdown-content" id="themeDropdown">
+              <button class="theme-option" data-theme="theme-midnight-blue">
+                <span class="theme-dot midnight-blue"></span> Midnight Blue
+              </button>
+              <button class="theme-option" data-theme="theme-cyberpunk">
+                <span class="theme-dot cyberpunk"></span> Cyberpunk 2077
+              </button>
+              <button class="theme-option" data-theme="theme-neon-purple">
+                <span class="theme-dot neon-purple"></span> Neon Purple
+              </button>
+              <button class="theme-option" data-theme="theme-glass-dark">
+                <span class="theme-dot glass-dark"></span> Dark Glass
+              </button>
+            </div>
+          </div>
+          
+          <button class="btn-icon" id="infoBtn" title="About / Help">
+            <i data-lucide="help-circle"></i>
+          </button>
+        </div>
+      </header>
+
+      <!-- Video Player Wrapper -->
+      <div class="player-wrapper">
+        <div class="player-container" id="playerContainer">
+          <!-- Video element -->
+          <video id="videoPlayer" crossorigin="anonymous" playsinline></video>
+          
+          <!-- Splash Screen (shown before video starts) -->
+          <div class="player-splash" id="playerSplash">
+            <div class="splash-content">
+              <i data-lucide="play-circle" class="splash-play-icon"></i>
+              <h3>Ready to Stream</h3>
+              <p>Select any channel from the sidebar to begin watching live television.</p>
+              <div class="playlist-quick-stats">
+                <span id="statChannelsCount">0</span> channels loaded
+              </div>
+            </div>
+          </div>
+
+          <!-- Video Loading Overlay -->
+          <div class="player-overlay-loading hidden" id="playerLoading">
+            <div class="spinner-large"></div>
+            <span>Buffering Live Stream...</span>
+          </div>
+
+          <!-- Video Error Overlay -->
+          <div class="player-overlay-error hidden" id="playerError">
+            <i data-lucide="alert-triangle"></i>
+            <h3>Unable to Load Stream</h3>
+            <p id="errorMessage">This channel might be temporarily offline or requires a CORS proxy.</p>
+            <div class="error-actions">
+              <button class="btn btn-secondary" id="retryStreamBtn">
+                <i data-lucide="rotate-cw"></i> Retry Stream
+              </button>
+              <button class="btn btn-primary" id="proxyBtn" title="Bypasses CORS restrictions using a proxy server">
+                <i data-lucide="shield-check"></i> Load via Proxy
+              </button>
+            </div>
+          </div>
+
+          <!-- Stats For Nerds Overlay (hidden by default) -->
+          <div class="stats-for-nerds hidden" id="statsForNerds">
+            <h4>Stream Info <button id="closeStatsBtn"><i data-lucide="x"></i></button></h4>
+            <table>
+              <tr>
+                <td>Resolution</td>
+                <td id="statResolution">0x0</td>
+              </tr>
+              <tr>
+                <td>Bitrate</td>
+                <td id="statBitrate">N/A</td>
+              </tr>
+              <tr>
+                <td>Buffer Length</td>
+                <td id="statBuffer">0.0s</td>
+              </tr>
+              <tr>
+                <td>Stream Type</td>
+                <td id="statType">HLS (hls.js)</td>
+              </tr>
+              <tr>
+                <td>CORS Proxy</td>
+                <td id="statProxy">Disabled</td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Video custom control bar overlays (hidden in fullscreen or when mouse is idle) -->
+          <div class="player-controls-overlay" id="playerControlsOverlay">
+            <div class="control-bar-top">
+              <span class="live-indicator">
+                <span class="live-dot"></span> LIVE
+              </span>
+            </div>
+            
+            <div class="control-bar-bottom">
+              <div class="controls-left">
+                <button class="control-btn" id="playPauseBtn" aria-label="Play/Pause">
+                  <i data-lucide="play"></i>
+                </button>
+                <button class="control-btn" id="stopBtn" aria-label="Stop stream" title="Stop Stream">
+                  <i data-lucide="square"></i>
+                </button>
+                <button class="control-btn" id="reloadBtn" aria-label="Reload stream">
+                  <i data-lucide="refresh-cw"></i>
+                </button>
+                <div class="volume-container">
+                  <button class="control-btn" id="volumeBtn" aria-label="Volume">
+                    <i data-lucide="volume-2"></i>
+                  </button>
+                  <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="0.8" class="volume-slider">
+                </div>
+              </div>
+              
+              <div class="controls-right">
+                <button class="control-btn" id="statsToggleBtn" title="Stats for Nerds">
+                  <i data-lucide="info"></i>
+                </button>
+                <button class="control-btn" id="favoriteToggleBtn" title="Add to Favorites">
+                  <i data-lucide="star"></i>
+                </button>
+                <button class="control-btn" id="pipBtn" title="Picture in Picture">
+                  <i data-lucide="external-link"></i>
+                </button>
+                <button class="control-btn" id="fullscreenBtn" title="Toggle Fullscreen">
+                  <i data-lucide="maximize"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Channel information card underneath player -->
+        <div class="channel-details-card hidden" id="channelDetailsCard">
+          <div class="details-main">
+            <div class="details-text">
+              <h3 id="detailsName">Channel Name</h3>
+              <p id="detailsUrl" class="stream-url-text">http://example.com/stream.m3u8</p>
+            </div>
+          </div>
+          <div class="details-meta">
+            <div class="meta-item">
+              <span class="meta-label">Category:</span>
+              <span class="meta-val" id="detailsCategory">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Country:</span>
+              <span class="meta-val" id="detailsCountry">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Language:</span>
+              <span class="meta-val" id="detailsLanguage">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Grid View Wrapper (hidden by default) -->
+      <div class="grid-view-wrapper hidden" id="gridViewWrapper">
+        <!-- Grid View Toolbar (search, filter, count) -->
+        <div class="grid-toolbar">
+          <div class="grid-toolbar-left">
+            <h3>Channel Grid Mode (Video Wall)</h3>
+            <span class="badge" id="gridChannelsCount">0 channels</span>
+          </div>
+          <div class="grid-toolbar-right">
+            <div class="grid-search-box">
+              <i data-lucide="search" class="search-icon"></i>
+              <input type="text" id="gridChannelSearch" placeholder="Search grid channels..." class="search-input">
+            </div>
+            <select id="gridCategorySelect" class="styled-select">
+              <option value="all">All Categories</option>
+            </select>
+            <select id="gridCountrySelect" class="styled-select">
+              <option value="all">All Countries</option>
+            </select>
+            <select id="gridLanguageSelect" class="styled-select">
+              <option value="all">All Languages</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Grid Cards Container -->
+        <div class="grid-cards-container" id="gridCardsContainer">
+          <!-- Cards will be dynamically generated here -->
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="grid-pagination" id="gridPagination">
+          <button class="btn btn-secondary btn-sm" id="gridPrevPage" title="Previous 10 Pages" disabled>
+            <i data-lucide="chevrons-left"></i> Prev Block
+          </button>
+          
+          <div class="grid-page-numbers" id="gridPageNumbers">
+            <!-- Dynamic page numbers will be added here -->
+          </div>
+          
+          <button class="btn btn-secondary btn-sm" id="gridNextPage" title="Next 10 Pages" disabled>
+            Next Block <i data-lucide="chevrons-right"></i>
+          </button>
+
+          <span class="pagination-total" id="gridPaginationTotal">of 0</span>
+
+          <div class="grid-goto-page">
+            <input type="number" id="gridGotoPageInput" min="1" placeholder="Page..." class="styled-input page-jump-input">
+            <button class="btn btn-primary btn-sm" id="gridGotoPageBtn">Go</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Welcome / Info Modal -->
+  <div class="modal-overlay hidden" id="infoModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>About AeroTV</h3>
+        <button class="close-modal-btn" id="closeInfoModal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p><strong>AeroTV</strong> is a premium, open-source web-based IPTV media player designed to watch free and legal public television channels from around the world.</p>
+        
+        <h4>Features:</h4>
+        <ul>
+          <li><strong>Curated Playlists:</strong> Pre-loaded playlists categorized by News, Movies, Music, and Documentaries.</li>
+          <li><strong>Custom Playlists:</strong> Input your own M3U or M3U8 IPTV URL.</li>
+          <li><strong>Favorites System:</strong> Star your favorite channels for quick loading.</li>
+          <li><strong>Custom Controls:</strong> Play/Pause, volume, stats panel, Picture-in-Picture, and Fullscreen modes.</li>
+          <li><strong>CORS Proxy:</strong> Built-in support to stream files bypassing strict browser Cross-Origin Resource Sharing rules.</li>
+          <li><strong>Cyberpunk & Glassmorphism themes:</strong> Switch styles seamlessly to match your aesthetics.</li>
+        </ul>
+
+        <h4>Important Notice Regarding Streams:</h4>
+        <p class="modal-warning">This program plays streams from publicly available playlists. Some streams may experience downtime, geo-restrictions, or require standard browser permissions. If a stream fails, try activating the <strong>"Load via Proxy"</strong> button or check if your internet connection is filtering HLS packets.</p>
+        
+        <p class="modal-footer">Built for speed, convenience, and modern aesthetics.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Javascript -->
+  <script src="app.js"></script>
+</body>
+</html>
