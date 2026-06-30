@@ -1,6 +1,19 @@
-/* AeroTV - Application JavaScript Logic */
+/* miscj-tv - Application JavaScript Logic */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // --- Migration of localStorage keys from aerotv_* to miscjtv_* ---
+  const migrateKey = (oldKey, newKey) => {
+    if (localStorage.getItem(oldKey) && !localStorage.getItem(newKey)) {
+      localStorage.setItem(newKey, localStorage.getItem(oldKey));
+    }
+  };
+  migrateKey('aerotv_favorites', 'miscjtv_favorites');
+  migrateKey('aerotv_custom_playlists', 'miscjtv_custom_playlists');
+  migrateKey('aerotv_current_playlist', 'miscjtv_current_playlist');
+  migrateKey('aerotv_theme', 'miscjtv_theme');
+  migrateKey('aerotv_active_channel_url', 'miscjtv_active_channel_url');
+  migrateKey('aerotv_volume', 'miscjtv_volume');
+
   // --- DOM Elements ---
   const video = document.getElementById('videoPlayer');
   const playlistSelect = document.getElementById('playlistSelect');
@@ -76,9 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let channels = [];
   let isScanning = false;
   let showOnlineOnly = false;
-  let favorites = JSON.parse(localStorage.getItem('aerotv_favorites')) || [];
-  let customPlaylists = JSON.parse(localStorage.getItem('aerotv_custom_playlists')) || [];
-  let currentPlaylistUrl = localStorage.getItem('aerotv_current_playlist') || playlistSelect.value;
+  let favorites = JSON.parse(localStorage.getItem('miscjtv_favorites')) || [];
+  let customPlaylists = JSON.parse(localStorage.getItem('miscjtv_custom_playlists')) || [];
+  let currentPlaylistUrl = localStorage.getItem('miscjtv_current_playlist') || playlistSelect.value;
   let activeChannel = null;
   let hlsInstance = null;
   let currentCategory = 'all';
@@ -104,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function init() {
     lucide.createIcons();
     setupEventListeners();
-    loadTheme(localStorage.getItem('aerotv_theme') || 'theme-midnight-blue');
+    loadTheme(localStorage.getItem('miscjtv_theme') || 'theme-midnight-blue');
     loadSavedCustomPlaylists();
     
     // Select last active playlist in dropdown
@@ -123,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function loadTheme(themeName) {
     document.body.className = '';
     document.body.classList.add(themeName);
-    localStorage.setItem('aerotv_theme', themeName);
+    localStorage.setItem('miscjtv_theme', themeName);
   }
 
   // --- Custom Playlist Dropdown Loading ---
@@ -294,6 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
           }
         }
 
+        // Name is usually after the last comma of the #EXTINF line
+        let channelName = 'Unknown Channel';
+        const commaIndex = line.lastIndexOf(',');
+        if (commaIndex !== -1) {
+          channelName = line.substring(commaIndex + 1).trim() || channelName;
+        }
+
         // Apply dynamic mappings based on the playlist structure
         if (isLanguagePlaylist) {
           parsedLanguage = parsedCategory; // E.g., Abkhazian, Afrikaans, Albanian
@@ -306,6 +326,44 @@ document.addEventListener('DOMContentLoaded', () => {
         // Resolve Country Name from Country Code if not explicitly in headers
         if (!parsedCountry && countryCode) {
           parsedCountry = countryMap[countryCode] || countryCode.toUpperCase();
+        }
+
+        // Recover country/language from channel name if still undefined or Global
+        if (!parsedCountry || parsedCountry === 'Global') {
+          let extractedCountryCode = '';
+          const nameLower = channelName.toLowerCase();
+          const prefixMatch = nameLower.match(/^(us|usa|uk|gb|ca|br|ar|de|fr|es|it|nl|in|my|sg|ph|cn|tw|hk)\s*[:\|_-]\s*/i);
+          if (prefixMatch) {
+            extractedCountryCode = prefixMatch[1].toLowerCase();
+          } else {
+            const parenMatch = nameLower.match(/\((us|usa|uk|gb|ca|br|ar|de|fr|es|it|nl|in|my|sg|ph|cn|tw|hk)\)/i);
+            if (parenMatch) {
+              extractedCountryCode = parenMatch[1].toLowerCase();
+            }
+          }
+
+          if (extractedCountryCode) {
+            const normMap = {
+              'usa': 'us',
+              'gbr': 'gb', 'uk': 'gb',
+              'can': 'ca',
+              'bra': 'br',
+              'arg': 'ar',
+              'deu': 'de',
+              'fra': 'fr',
+              'esp': 'es',
+              'ita': 'it',
+              'nld': 'nl',
+              'ind': 'in'
+            };
+            const finalCode = normMap[extractedCountryCode] || extractedCountryCode;
+            if (countryMap[finalCode]) {
+              parsedCountry = countryMap[finalCode];
+              if (countryToLanguageMap[finalCode]) {
+                parsedLanguage = countryToLanguageMap[finalCode];
+              }
+            }
+          }
         }
 
         // Resolve Language Name from Country Code or Country Name if not explicitly in headers
@@ -321,29 +379,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         tempChannel = {
-          name: 'Unknown Channel',
+          name: channelName,
           logo: logoMatch ? logoMatch[1] : '',
           category: parsedCategory || 'General',
           country: parsedCountry || 'Global',
           language: parsedLanguage || 'English',
           url: ''
         };
-        
-        // Name is usually after the last comma of the #EXTINF line
-        const commaIndex = line.lastIndexOf(',');
-        if (commaIndex !== -1) {
-          tempChannel.name = line.substring(commaIndex + 1).trim() || tempChannel.name;
-        }
 
         // Heuristic language refinements for multilingual countries
         const nameLower = tempChannel.name.toLowerCase();
         const idLower = tvgId.toLowerCase();
         let refinedLanguage = '';
 
-        // 1. Check for language suffix in parentheses, e.g. "HBO (ENG)", "MTV (FRA)", "RTL (NLD)"
-        const langSuffixMatch = tempChannel.name.match(/\(([a-z]{2,3})\)$/i);
-        if (langSuffixMatch) {
-          const code = langSuffixMatch[1].toLowerCase();
+        // 1. Check for language/country suffix in parentheses, e.g. "HBO (ENG)", "MTV (FRA)", "RTL (NLD)", "Fox Sports (US)"
+        const suffixMatch = tempChannel.name.match(/\(([a-z]{2,3})\)$/i);
+        if (suffixMatch) {
+          const code = suffixMatch[1].toLowerCase();
           const codeMap = {
             'en': 'English', 'eng': 'English',
             'es': 'Spanish', 'esp': 'Spanish',
@@ -369,6 +421,36 @@ document.addEventListener('DOMContentLoaded', () => {
           };
           if (codeMap[code]) {
             refinedLanguage = codeMap[code];
+          } else {
+            if (countryMap[code]) {
+              tempChannel.country = countryMap[code];
+              if (countryToLanguageMap[code]) {
+                refinedLanguage = countryToLanguageMap[code];
+              }
+            } else {
+              // Try common 3-letter country codes or abbreviations
+              const code3Map = {
+                'usa': 'United States',
+                'gbr': 'United Kingdom',
+                'can': 'Canada',
+                'bra': 'Brazil',
+                'arg': 'Argentina',
+                'deu': 'Germany',
+                'fra': 'France',
+                'esp': 'Spain',
+                'ita': 'Italy',
+                'nld': 'Netherlands',
+                'ind': 'India'
+              };
+              if (code3Map[code]) {
+                const countryName = code3Map[code];
+                tempChannel.country = countryName;
+                const code2 = Object.keys(countryMap).find(k => countryMap[k] === countryName);
+                if (code2 && countryToLanguageMap[code2]) {
+                  refinedLanguage = countryToLanguageMap[code2];
+                }
+              }
+            }
           }
         }
 
@@ -376,11 +458,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!refinedLanguage) {
           // India
           if (countryCode === 'in' || tempChannel.country === 'India') {
-            if (nameLower.includes('telugu') || idLower.includes('telugu')) refinedLanguage = 'Telugu';
-            else if (nameLower.includes('tamil') || idLower.includes('tamil')) refinedLanguage = 'Tamil';
-            else if (nameLower.includes('malayalam') || idLower.includes('malayalam')) refinedLanguage = 'Malayalam';
-            else if (nameLower.includes('kannada') || idLower.includes('kannada')) refinedLanguage = 'Kannada';
-            else if (nameLower.includes('bengali') || idLower.includes('bengali') || nameLower.includes('bangla') || idLower.includes('bangla')) refinedLanguage = 'Bengali';
+            const hasMalayalamKeyword = ['asianet', 'kairali', 'surya tv', 'suryatv', 'mazhavil', 'manorama', 'flowers tv', 'amrita tv', 'janam tv', 'mathrubhumi', 'mediaone', 'reporter tv', 'kaumudy', 'safari tv', 'shalom', 'dd malayalam', 'people tv', 'kerala'].some(k => nameLower.includes(k) || idLower.includes(k));
+            const hasTamilKeyword = ['sun tv', 'kalignar', 'vijay tv', 'jaya tv', 'raj tv', 'polimer', 'puthiya thalaimurai', 'thanthi', 'news7 tamil', 'news18 tamil', 'captain tv', 'makkal', 'vasanth', 'imayam', 'dd podhigai', 'suryatvtamil'].some(k => nameLower.includes(k) || idLower.includes(k));
+            const hasTeluguKeyword = ['etv', 'gemini', 'maa tv', 'tv9 telugu', 'ntv', 'sakshi', 'v6 news', 't news', 'abn andhrajyothy', 'tv5 telugu', 'mahaa', 'hmtv', 'raj news telugu', 'dd saptagiri', 'dd yadagiri', 'bhakthi'].some(k => nameLower.includes(k) || idLower.includes(k));
+            const hasKannadaKeyword = ['udaya', 'suvarna', 'tv9 kannada', 'public tv', 'kasturi', 'dighvijay', 'news18 kannada', 'dd chandana'].some(k => nameLower.includes(k) || idLower.includes(k));
+            const hasBengaliKeyword = ['jalsha', 'zee bangla', 'colors bangla', 'sony aath', 'news18 bangla', 'abp ananda', '24 ghanta', 'dd bangla'].some(k => nameLower.includes(k) || idLower.includes(k));
+
+            if (hasMalayalamKeyword || nameLower.includes('malayalam') || idLower.includes('malayalam')) refinedLanguage = 'Malayalam';
+            else if (hasTamilKeyword || nameLower.includes('tamil') || idLower.includes('tamil')) refinedLanguage = 'Tamil';
+            else if (hasTeluguKeyword || nameLower.includes('telugu') || idLower.includes('telugu')) refinedLanguage = 'Telugu';
+            else if (hasKannadaKeyword || nameLower.includes('kannada') || idLower.includes('kannada')) refinedLanguage = 'Kannada';
+            else if (hasBengaliKeyword || nameLower.includes('bengali') || idLower.includes('bengali') || nameLower.includes('bangla') || idLower.includes('bangla')) refinedLanguage = 'Bengali';
             else if (nameLower.includes('marathi') || idLower.includes('marathi')) refinedLanguage = 'Marathi';
             else if (nameLower.includes('gujarati') || idLower.includes('gujarati')) refinedLanguage = 'Gujarati';
             else if (nameLower.includes('punjabi') || idLower.includes('punjabi')) refinedLanguage = 'Punjabi';
@@ -393,9 +481,13 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           // Malaysia & Singapore
           else if (countryCode === 'my' || countryCode === 'sg' || tempChannel.country === 'Malaysia' || tempChannel.country === 'Singapore') {
-            if (nameLower.includes('tamil') || idLower.includes('tamil')) refinedLanguage = 'Tamil';
-            else if (nameLower.includes('chinese') || nameLower.includes('mandarin') || nameLower.includes('cantonese') || /[\u4e00-\u9fa5]/.test(tempChannel.name)) refinedLanguage = 'Chinese';
-            else if (nameLower.includes('malay') || nameLower.includes('melayu') || idLower.includes('melayu') || nameLower.includes('tv1') || nameLower.includes('tv2') || nameLower.includes('tv3')) refinedLanguage = 'Malay';
+            const hasTamil = ['vellithirai', 'vinmeen', 'vasantham', 'tamil'].some(k => nameLower.includes(k) || idLower.includes(k));
+            const hasChinese = ['8tv', 'ntv7', 'astro xuan', 'wah lai toi', 'aec', 'shuang xing', 'tvb', 'channel 8', 'channel u', 'mandarin', 'cantonese', 'chinese', '华', '粤'].some(k => nameLower.includes(k) || idLower.includes(k)) || /[\u4e00-\u9fa5]/.test(tempChannel.name);
+            const hasMalay = ['ria', 'prima', 'arena', 'awani', 'warna', 'citra', 'oasis', 'melayu', 'malay', 'tv1', 'tv2', 'tv3', 'suria'].some(k => nameLower.includes(k) || idLower.includes(k));
+            
+            if (hasTamil) refinedLanguage = 'Tamil';
+            else if (hasChinese) refinedLanguage = 'Chinese';
+            else if (hasMalay) refinedLanguage = 'Malay';
             else if (nameLower.includes('english') || idLower.includes('english')) refinedLanguage = 'English';
           }
           // Philippines
@@ -413,11 +505,9 @@ document.addEventListener('DOMContentLoaded', () => {
           }
           // Canada
           else if (countryCode === 'ca' || tempChannel.country === 'Canada') {
-            if (nameLower.includes('tva') || nameLower.includes('ici') || nameLower.includes('radio-canada') || nameLower.includes('tele') || nameLower.includes('français') || nameLower.includes('french')) {
-              refinedLanguage = 'French';
-            } else {
-              refinedLanguage = 'English';
-            }
+            const hasFrench = ['radio-canada', 'tva', 'rds', 'tv5 quebec', 'tele-quebec', 'noovo', 'canal d', 'vrak', 'lcn', 'canal vie', 'historiatv', 'ztele', 'unis', 'tfo', 'quebec', 'francais', 'french'].some(k => nameLower.includes(k) || idLower.includes(k));
+            if (hasFrench) refinedLanguage = 'French';
+            else refinedLanguage = 'English';
           }
           // Switzerland
           else if (countryCode === 'ch' || tempChannel.country === 'Switzerland') {
@@ -443,6 +533,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       } else if (line.startsWith('http') && tempChannel) {
         tempChannel.url = line;
+        
+        // General Category Refinement Heuristics
+        const catLower = tempChannel.category.toLowerCase();
+        if (catLower === 'general' || catLower === 'undefined' || catLower === '') {
+          const nameLower = tempChannel.name.toLowerCase();
+          if (['sports', 'sport', 'fox sp', 'espn', 'bein', 'sky sp', 'supersport', 'eurosport', 'golf', 'ufc', 'nba', 'nfl', 'wwe', 'racing', 'tennis', 'futbol', 'football'].some(k => nameLower.includes(k))) {
+            tempChannel.category = 'Sports';
+          } else if (['movies', 'movie', 'cine', 'hbo', 'showtime', 'starz', 'cinema', 'filme', 'pelicula', 'action movies', 'thriller'].some(k => nameLower.includes(k))) {
+            tempChannel.category = 'Movies';
+          } else if (['news', 'cnn', 'bbc', 'nbc news', 'msnbc', 'fox news', 'al jazeera', 'reuters', 'bloomberg', 'cnbc', 'weather'].some(k => nameLower.includes(k))) {
+            tempChannel.category = 'News';
+          } else if (['documentary', 'documentales', 'discovery', 'history', 'national geographic', 'nat geo', 'science', 'animal planet'].some(k => nameLower.includes(k))) {
+            tempChannel.category = 'Documentary';
+          } else if (['music', 'musica', 'mtv', 'viva', 'vh1', 'classic fm', 'radio'].some(k => nameLower.includes(k))) {
+            tempChannel.category = 'Music';
+          } else if (['kids', 'cartoons', 'cartoon', 'disney', 'nickelodeon', 'nick jr', 'boomerang', 'baby tv'].some(k => nameLower.includes(k))) {
+            tempChannel.category = 'Kids';
+          }
+        }
+        
         parsedChannels.push(tempChannel);
         tempChannel = null;
       }
@@ -1197,7 +1307,7 @@ document.addEventListener('DOMContentLoaded', () => {
       buttonElement.classList.remove('is-favorite');
       buttonElement.setAttribute('title', 'Add to favorites');
     }
-    localStorage.setItem('aerotv_favorites', JSON.stringify(favorites));
+    localStorage.setItem('miscjtv_favorites', JSON.stringify(favorites));
     
     // Update active channel star button color state if this channel is currently active
     if (activeChannel && activeChannel.url === channelObj.url) {
@@ -1228,7 +1338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     activeChannel = channel;
     
     // Save state
-    localStorage.setItem('aerotv_active_channel_url', channel.url);
+    localStorage.setItem('miscjtv_active_channel_url', channel.url);
     
     // Update active visual elements in list
     document.querySelectorAll('.channel-item').forEach(item => {
@@ -1397,7 +1507,7 @@ document.addEventListener('DOMContentLoaded', () => {
     video.load();
     
     activeChannel = null;
-    localStorage.removeItem('aerotv_active_channel_url');
+    localStorage.removeItem('miscjtv_active_channel_url');
     
     document.querySelectorAll('.channel-item').forEach(item => {
       item.classList.remove('active');
@@ -1449,7 +1559,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Volume System Controls ---
   function setupVolume() {
     // Fetch last saved volume
-    const savedVol = localStorage.getItem('aerotv_volume') || 0.8;
+    const savedVol = localStorage.getItem('miscjtv_volume') || 0.8;
     video.volume = savedVol;
     volumeSlider.value = savedVol;
     updateVolumeIcon(savedVol);
@@ -1644,7 +1754,7 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         customPlaylistContainer.classList.add('hidden');
         currentPlaylistUrl = val;
-        localStorage.setItem('aerotv_current_playlist', val);
+        localStorage.setItem('miscjtv_current_playlist', val);
         fetchPlaylist(val);
       }
     });
@@ -1670,7 +1780,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Save to local custom playlists cache if new
       if (!customPlaylists.some(p => p.url === url)) {
         customPlaylists.push({ name: playlistName, url: url });
-        localStorage.setItem('aerotv_custom_playlists', JSON.stringify(customPlaylists));
+        localStorage.setItem('miscjtv_custom_playlists', JSON.stringify(customPlaylists));
       }
       
       addCustomOptionToDropdown(playlistName, url);
@@ -1678,7 +1788,7 @@ document.addEventListener('DOMContentLoaded', () => {
       customPlaylistContainer.classList.add('hidden');
       
       currentPlaylistUrl = url;
-      localStorage.setItem('aerotv_current_playlist', url);
+      localStorage.setItem('miscjtv_current_playlist', url);
       fetchPlaylist(url);
     });
 
@@ -1770,14 +1880,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const vol = e.target.value;
       video.volume = vol;
       video.muted = false;
-      localStorage.setItem('aerotv_volume', vol);
+      localStorage.setItem('miscjtv_volume', vol);
       updateVolumeIcon(vol);
     });
 
     volumeBtn.addEventListener('click', () => {
       if (video.muted || video.volume === 0) {
         video.muted = false;
-        video.volume = localStorage.getItem('aerotv_volume') || 0.8;
+        video.volume = localStorage.getItem('miscjtv_volume') || 0.8;
         volumeSlider.value = video.volume;
       } else {
         video.muted = true;

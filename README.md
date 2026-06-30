@@ -1,6 +1,6 @@
-# AeroTV 📺
+# miscj-tv 📺
 
-AeroTV is a premium, modern, web-based IPTV (Internet Protocol Television) player designed for streaming free live television channels from around the world. Built with high performance, beautiful custom aesthetics, and a built-in CORS proxy, AeroTV offers a seamless browser streaming experience.
+miscj-tv is a premium, modern, web-based IPTV (Internet Protocol Television) player designed for streaming free live television channels from around the world. Built with high performance, beautiful custom aesthetics, and a built-in CORS proxy, miscj-tv offers a seamless browser streaming experience.
 
 ---
 

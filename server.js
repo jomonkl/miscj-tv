@@ -1,4 +1,4 @@
-/* AeroTV - Node.js Server & CORS Proxy */
+/* miscj-tv - Node.js Server & CORS Proxy */
 
 const http = require('http');
 const https = require('https');
@@ -218,7 +218,7 @@ function verifyUrl(targetUrlStr, res) {
 // Main HTTP Server
 const server = http.createServer((req, res) => {
   // Logger
-  console.log(`${new Date().toISOString().substring(11, 19)} [AeroTV] ${req.method} ${req.url}`);
+  console.log(`${new Date().toISOString().substring(11, 19)} [miscj-tv] ${req.method} ${req.url}`);
 
   // CORS Preflight headers
   if (req.method === 'OPTIONS') {
@@ -269,7 +269,7 @@ const server = http.createServer((req, res) => {
         <!DOCTYPE html>
         <html lang="en">
         <head>
-          <title>404 Not Found | AeroTV</title>
+          <title>404 Not Found | miscj-tv</title>
           <style>
             body { background: #0a0f1d; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
             h1 { color: #3b82f6; margin-bottom: 8px; }
@@ -280,8 +280,8 @@ const server = http.createServer((req, res) => {
         </head>
         <body>
           <h1>404 File Not Found</h1>
-          <p>The requested file could not be found on AeroTV.</p>
-          <a href="/">Back to AeroTV Home</a>
+          <p>The requested file could not be found on miscj-tv.</p>
+          <a href="/">Back to miscj-tv Home</a>
         </body>
         </html>
       `);
@@ -298,7 +298,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log('\n======================================================');
-  console.log(`  AeroTV Server is running at: http://localhost:${PORT}`);
+  console.log(`  miscj-tv Server is running at: http://localhost:${PORT}`);
   console.log('======================================================');
   console.log('  Press Ctrl+C to stop the server.');
   console.log('  To load streams bypass CORS restrictions, streams are');
